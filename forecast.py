@@ -7,7 +7,7 @@ import requests
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from get_nws_data import get_nws_data
+from get_nws_data import get_nws_data, from_computer_location_get_coordinates, from_coordinates_get_info
 
 places = {
 	"Ann Arbor": (42.2808, -83.7430),
@@ -19,47 +19,8 @@ places = {
 	#"FSU": (30.4419, -84.2985)
 }
 
-def from_computer_location_get_coordinates():
-	ipinfo = requests.get("https://ipinfo.io/json")
-
-	if ipinfo.status_code == 200:
-		ipinfo = ipinfo.json()
-	stloc = ipinfo['loc'].split(",")
-	my_coordinates = list(map(float,stloc))
-	return tuple(my_coordinates)
-
-
-
-
-def from_coordinates_get_info(coordinates:tuple):
-	# Takes in latitude and longitude and returns 
-	# multiple strings, some of which are API endpoints.
-
-	lattitude, longitude = coordinates
-	endpoint = f"points/{lattitude},{longitude}"
-	location_in_county = get_nws_data(endpoint, coordinates) 
-	location_properties = location_in_county["properties"]
-
-	location_name = location_properties["relativeLocation"]["properties"]["city"]
-	location_timezone = location_properties["timeZone"]
-	forecast_endpoint = location_properties["forecast"]
-	forecast_hourly_endpoint = location_properties["forecastHourly"]
-	forecast_grid_endpoint = location_properties["forecastGridData"]
-	county_endpoint = location_properties["county"]
-
-	information = {
-		"name": location_name,
-		"timezone": location_timezone,
-		"forecast endpoint": forecast_endpoint,
-		"hourly forecast endpoint": forecast_hourly_endpoint,
-		#"forecast_grid_endpoint":forecast_grid_endpoint,
-		#"county_endpoint": county_endpoint
-	}
-
-	return information
 
 get_value = lambda dictionary: round(dictionary["value"])
-
 
 my_coordinates = from_computer_location_get_coordinates()
 points_information = from_coordinates_get_info(my_coordinates)
@@ -67,7 +28,9 @@ data = get_nws_data(points_information["hourly forecast endpoint"], my_coordinat
 
 timezone = points_information["timezone"]
 forecast_periods = data["properties"]["periods"]
+
 full_df = pd.DataFrame(forecast_periods)
+
 full_df["startTime"] = pd.to_datetime(full_df["startTime"], utc=False)
 full_df["endTime"] = pd.to_datetime(full_df["endTime"], utc=False)
 full_df["probabilityOfPrecipitation"] = full_df["probabilityOfPrecipitation"].apply(get_value)
@@ -79,6 +42,7 @@ df = full_df[["startTime",
 			  "temperature", 
 			  'probabilityOfPrecipitation',
        		  'dewpoint', 
+			  'isDaytime',
 			  'relativeHumidity', 
 			  'windSpeed', 
 			  'windDirection',
@@ -86,6 +50,7 @@ df = full_df[["startTime",
 			]
 df.to_csv("~/Desktop/WeatherForecast.csv")
 
+exit()
 if len(sys.argv) > 1:
 	hours = int(sys.argv[1])
 else:
@@ -96,7 +61,7 @@ y_range = range(0, 105, 5)
 
 print(df.to_string())
 
-fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True, figsize=(10,8))
+fig, ax = plt.subplots(nrows=1, ncols=1, sharex=True, figsize=(14,8))
 plt.title(f"Weather Forecast for {points_information['name']}")
 
 date_format = mdates.DateFormatter(fmt='%a\n%I%p', tz=timezone)
